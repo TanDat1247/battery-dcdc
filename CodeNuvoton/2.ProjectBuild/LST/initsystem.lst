@@ -1,0 +1,183 @@
+C51 COMPILER V9.60.0.0   INITSYSTEM                                                        05/14/2021 14:51:37 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE INITSYSTEM
+OBJECT MODULE PLACED IN .\Output\initsystem.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE Code\initsystem.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\1.LibNuvoton\Includ
+                    -e) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\initsystem.lst) OBJECT(.\Output\initsystem.obj)
+
+line level    source
+
+   1          #include "pjcommon.h"
+   2          //#include "Function_define.h"
+   3          bit BIT_TMP;
+   4          void SystemInit(void)
+   5          {
+   6   1          InitClock();
+   7   1          PwmInit();
+   8   1          GPIO_User_Init();
+   9   1          TimerTickInit();
+  10   1          Timer_Timming_Hw_Init();
+  11   1      
+  12   1          /*INIT UART*/
+  13   1          InitialUART0_Timer3(9600);
+  14   1          TI = 1;                                                                                                                     // Important, use prinft function must set TI=1;
+  15   1          set_ES;
+  16   1          /*INIT UART*/
+  17   1          //PwmInit();        
+  18   1          set_ADCF;   
+  19   1      }
+  20          
+  21          void InitClock(void)
+  22          {
+  23   1              /* MCU power on system clock is HIRC (16 MHz) */
+  24   1              /* Mac dinh xung clock la 16Mhz */
+  25   1      }
+  26          
+  27          void TimerTickInit(void)
+  28          {
+  29   1      //  - In this example we need to generate a time base equal to 1 ms
+  30   1          clr_T0M;
+  31   1          TMOD&=0xF0;TMOD|=0x01;
+  32   1          u8TH0_Tmp = (65536-TH0_VALUE)/256;
+  33   1          u8TL0_Tmp = (65536-TH0_VALUE)%256;    
+  34   1          TH0 = u8TH0_Tmp;
+  35   1          TL0 = u8TL0_Tmp;
+  36   1          set_ET0;                                    //enable Timer0 interrupt 
+  37   1          set_EA;                                     //enable interrupts
+  38   1          set_TR0;                                    //Timer0 run   
+  39   1      }
+  40          void GPIO_User_Init(void){
+  41   1      //      RELAY_1_INIT;
+  42   1          EN_DRV_INIT;
+  43   1              EN_DRV_LOW;
+  44   1              
+  45   1              PWM0_P12_OUTPUT_DISABLE;
+  46   1              PWM1_P11_OUTPUT_DISABLE;
+  47   1              PWM_H_LOW;
+  48   1              PWM_L_LOW;
+  49   1      }
+  50          static void Timer_Timming_Hw_Init(void){
+  51   1          clr_T1M;
+  52   1          //TMOD&=0x0F;TMOD|=0x10;
+  53   1          TIMER1_MODE1_ENABLE;
+  54   1          u8TH1_Tmp = (65536-TH1_VALUE)/256;
+C51 COMPILER V9.60.0.0   INITSYSTEM                                                        05/14/2021 14:51:37 PAGE 2   
+
+  55   1          u8TL1_Tmp = (65536-TH1_VALUE)%256;  
+  56   1          TH1 = u8TH1_Tmp;
+  57   1          TL1 = u8TL1_Tmp;
+  58   1          set_ET1;                                    //enable Timer1 interrupt
+  59   1          set_EA;                                     //enable interrupts
+  60   1          set_TR1;                                    //Timer1 run
+  61   1      }
+  62          
+  63          #if 0
+              char putchar (char c)
+              {
+                  SBUF_1 = c;      /* output character */
+                  while (!TI_1);  /* wait until transmitter ready */
+                  TI_1 = 0;
+                  return (c);
+              }
+              #else
+  72          char putchar (char c)  {
+  73   1          SBUF = c;
+  74   1          while (!TI);
+  75   1          TI = 0;
+  76   1          return (c);
+  77   1      }
+  78          #endif
+  79          
+  80          void InitialUART0_Timer3(UINT32 u32Baudrate) //use timer3 as Baudrate generator
+  81          {
+  82   1          P06_Quasi_Mode;             //Setting UART pin as Quasi mode for transmit
+  83   1          P07_Quasi_Mode;             //Setting UART pin as Quasi mode for transmit   
+  84   1              
+  85   1          SCON = 0x50;     //UART0 Mode1,REN=1,TI=1
+  86   1          set_SMOD;        //UART0 Double Rate Enable
+  87   1          T3CON &= 0xF8;   //T3PS2=0,T3PS1=0,T3PS0=0(Prescale=1)
+  88   1          set_BRCK;        //UART0 baud rate clock source = Timer3
+  89   1      
+  90   1          #ifdef FOSC_160000
+  91   1              RH3    = HIBYTE(65536 - (1000000/u32Baudrate)-1);               /*16 MHz */
+  92   1              RL3    = LOBYTE(65536 - (1000000/u32Baudrate)-1);                       /*16 MHz */
+  93   1          #endif
+  94   1          #ifdef FOSC_166000
+                      RH3    = HIBYTE(65536 - (1037500/u32Baudrate));                         /*16.6 MHz */
+                      RL3    = LOBYTE(65536 - (1037500/u32Baudrate));                         /*16.6 MHz */
+                  #endif
+  98   1          set_TR3;         //Trigger Timer3
+  99   1              //set_TI;                                        //For printf function must setting TI = 1
+ 100   1      }
+ 101          
+ 102          void PwmInit(void)
+ 103          {
+ 104   1          Set_All_GPIO_Quasi_Mode;
+ 105   1          PWM_H_INIT;
+ 106   1          PWM_L_INIT;
+ 107   1      /*  PWM frequency = Fpwm/((PWMPH,PWMPL) + 1) <Fpwm = Fsys/PWM_CLOCK_DIV>    */
+ 108   1      /*--------------------------------------------------------------------------------------------------------
+             ----------
+ 109   1              PWM frequency   = Fpwm/((PWMPH,PWMPL)+1) = (16MHz/2)/(0x7CF+1) = 1KHz (1ms)
+ 110   1              PWM4 high duty  = PWM4H,PWM4L = 0x01CF = 1/4 PWM period
+ 111   1              PWM0 high duty  = PWM0H,PMW0L = 0x03CF = 1/2 PWM period
+ 112   1              Dead time                       = 0x1FF <PDTEN.4+PDTCNT[7:0]>/Fsys = 0x1FF/Fsys = 512/16000000 = 32 us (max value)
+ 113   1      ----------------------------------------------------------------------------------------------------------
+             --------*/
+ 114   1          PWM_CLOCK_FSYS;
+C51 COMPILER V9.60.0.0   INITSYSTEM                                                        05/14/2021 14:51:37 PAGE 3   
+
+ 115   1          PWM_CLOCK_DIV_2;
+ 116   1          PWM_COMPLEMENTARY_MODE;                                     //Only this 2mode support deat time function
+ 117   1          PWMPH = 0x00;
+ 118   1          PWMPL = 0xC7;            
+ 119   1      
+ 120   1          PWM0H = 0x00;
+ 121   1          PWM0L = 0x00;
+ 122   1          //set_SFRPAGE;                                                                              // PWM4 and PWM5 duty value need set SFPPAGE 1
+ 123   1      //              PWM4H = 0x01;
+ 124   1      //              PWM4L = 0xCF;
+ 125   1          //clr_SFRPAGE;
+ 126   1          
+ 127   1          PWM01_DEADTIME_ENABLE;
+ 128   1          //PWM45_DEADTIME_ENABLE;
+ 129   1          PWM_DEAD_TIME_VALUE(0x00F);                 //value never over 0x1FF
+ 130   1                      
+ 131   1      //Please always setting Dead time if needed before PWM run.             
+ 132   1          set_LOAD;
+ 133   1          set_PWMRUN;
+ 134   1      }
+ 135          
+ 136          void PWM_DEAD_TIME_VALUE(UINT16 DeadTimeData)
+ 137          {
+ 138   1              UINT8 deadtmphigh,deadtmplow;
+ 139   1              deadtmplow = DeadTimeData;
+ 140   1              deadtmphigh = DeadTimeData>>8;
+ 141   1              BIT_TMP = EA;
+ 142   1              if (deadtmphigh==0x01)
+ 143   1              {
+ 144   2                      EA = 0;
+ 145   2                      TA = 0xAA;
+ 146   2                      TA = 0x55;
+ 147   2                      PDTEN|=0x10;
+ 148   2              }
+ 149   1              TA = 0xAA;
+ 150   1              TA = 0x55;
+ 151   1              PDTCNT = deadtmplow;
+ 152   1              EA = BIT_TMP;
+ 153   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    336    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
